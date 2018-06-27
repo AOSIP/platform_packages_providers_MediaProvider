@@ -2720,8 +2720,8 @@ public class MediaProvider extends ContentProvider {
                     final String path = c.getString(0);
                     lastId = c.getLong(1);
 
-                    File file = new File(path);
-                    if (file.exists()) {
+                    File file = (path != null) ? new File(path) : null;
+                    if (file != null && file.exists()) {
                         // If the file actually exists, try to fix up the parent id.
                         // getParent() will add entries for any missing ancestors.
                         long parentId = getParent(helper, db, path);
@@ -4179,6 +4179,10 @@ public class MediaProvider extends ContentProvider {
     private static byte[] getCompressedAlbumArt(Context context, String[] rootPaths, String path) {
         byte[] compressed = null;
 
+        //When playing Music,plug out the SD card to cause this case.
+        if (path == null) {
+            return null;
+        }
         try {
             File f = new File(path);
             ParcelFileDescriptor pfd = ParcelFileDescriptor.open(f,
@@ -4252,9 +4256,18 @@ public class MediaProvider extends ContentProvider {
                         if (file.exists()) {
                             FileInputStream stream = null;
                             try {
-                                compressed = new byte[(int)file.length()];
-                                stream = new FileInputStream(file);
-                                stream.read(compressed);
+
+                                if (file.length() > 0 && file.length() < MAX_ALBUMTHUMBNAIL_FILE_SIZE) {
+                                    compressed = new byte[(int)file.length()];
+                                } else {
+                                    Log.d(TAG, "[getCompressedAlbumArt] bestmatch:" + bestmatch + ", file length: " + file.length());
+                                }
+
+                                if (compressed != null) {
+                                    stream = new FileInputStream(file);
+                                    stream.read(compressed);
+                                }
+
                             } catch (IOException ex) {
                                 compressed = null;
                             } catch (OutOfMemoryError ex) {
@@ -4874,6 +4887,9 @@ public class MediaProvider extends ContentProvider {
 
     // path for writing contents of in memory temp database
     private String mTempDatabasePath;
+
+    // set maximum album thumbnail file size for FULL HD 32 bit bimap (1920*1080*4)
+    private static int MAX_ALBUMTHUMBNAIL_FILE_SIZE = 8 * 1024 * 1024;
 
     // WARNING: the values of IMAGES_MEDIA, AUDIO_MEDIA, and VIDEO_MEDIA and AUDIO_PLAYLISTS
     // are stored in the "files" table, so do not renumber them unless you also add
